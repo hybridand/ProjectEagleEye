@@ -26,6 +26,19 @@
       th {
         background: #f3f3f3;
       }
+      label {
+        display: block;
+        margin: 0.6rem 0;
+      }
+      input,
+      select {
+        margin-left: 0.5rem;
+        padding: 4px;
+      }
+      #advice {
+        white-space: pre-line;
+        font-weight: 600;
+      }
     </style>
   </head>
   <body>
@@ -33,6 +46,37 @@
     <p>Upload a TrackMan CSV export to build your bag profile.</p>
     <input type="file" id="file" accept=".csv" />
     <table id="results"></table>
+    <h2>Shot advisor</h2>
+    <label
+      >Distance to target (m) <input type="number" id="dist" value="140"
+    /></label>
+    <label
+      >Wind (m/s) <input type="number" id="wind" value="0" step="0.5"
+    /></label>
+    <label
+      >Wind direction
+      <select id="winddir">
+        <option value="head">Headwind</option>
+        <option value="tail">Tailwind</option>
+      </select>
+    </label>
+    <label
+      >Lie
+      <select id="lie">
+        <option value="fairway">Fairway / tee</option>
+        <option value="rough">Rough</option>
+      </select>
+    </label>
+    <label
+      >Trouble
+      <select id="danger">
+        <option value="none">None</option>
+        <option value="short">Short of target (water, bunker)</option>
+        <option value="long">Long of target</option>
+      </select>
+    </label>
+    <button id="advise">Get advice</button>
+    <p id="advice"></p>
 
     <script>
       // Helpers: TrackMan uses commas as decimals ("83,9"), so convert first
@@ -84,6 +128,7 @@
             spread: std(list.map((x) => x.side)),
           }))
           .sort((a, b) => b.carry - a.carry);
+        saveBag(rows);
 
         // Gap to the next club down, counting full swings only (skip 3/4 shots)
         const full = rows.filter((r) => !r.club.includes("("));
@@ -129,6 +174,91 @@
           ].forEach((v) => (tr.insertCell().textContent = v));
         });
       }
+      // ---- Step 3: shot advisor ----
+      let bag = [];
+      const HEAD_PCT = 2; // % longer per m/s of headwind (rough rule of thumb)
+      const TAIL_PCT = 1; // % shorter per m/s of tailwind
+      const ROUGH_PCT = 8; // % longer from the rough
+
+      function saveBag(rows) {
+        bag = rows;
+        try {
+          localStorage.setItem("bag", JSON.stringify(rows));
+        } catch (e) {}
+      }
+
+      // Load a saved bag when the page opens
+      try {
+        bag = JSON.parse(localStorage.getItem("bag")) || [];
+      } catch (e) {
+        bag = [];
+      }
+
+      document.getElementById("advise").addEventListener("click", () => {
+        const out = document.getElementById("advice");
+        if (bag.length === 0) {
+          out.textContent = "Upload a TrackMan file first.";
+          return;
+        }
+
+        const dist = parseFloat(document.getElementById("dist").value);
+        const wind = parseFloat(document.getElementById("wind").value) || 0;
+        const dir = document.getElementById("winddir").value;
+        const lie = document.getElementById("lie").value;
+        const danger = document.getElementById("danger").value;
+        if (isNaN(dist)) {
+          out.textContent = "Enter a distance.";
+          return;
+        }
+
+        // Work out what the shot "plays like"
+        let adj =
+          dist * (1 + ((dir === "head" ? HEAD_PCT : -TAIL_PCT) * wind) / 100);
+        if (lie === "rough") adj *= 1 + ROUGH_PCT / 100;
+
+        // Trouble short = must carry it; trouble long = must not fly it
+        let options = bag;
+        if (danger === "short") options = bag.filter((c) => c.carry >= adj);
+        if (danger === "long") options = bag.filter((c) => c.carry <= adj);
+        if (options.length === 0) {
+          out.textContent =
+            "Plays like " +
+            adj.toFixed(0) +
+            " m. No club in your bag fits that safely.";
+          return;
+        }
+
+        // Pick the club whose carry is closest to the target
+        const club = options.reduce((best, c) =>
+          Math.abs(c.carry - adj) < Math.abs(best.carry - adj) ? c : best,
+        );
+
+        const aim = -club.side; // aim opposite to your average miss
+        const lines = [
+          "Plays like " + adj.toFixed(0) + " m.",
+          "Take: " + club.club + " (carries " + club.carry.toFixed(0) + " m)",
+          Math.abs(aim) < 2
+            ? "Aim: at the target."
+            : "Aim: " +
+              Math.abs(aim).toFixed(0) +
+              " m " +
+              (aim > 0 ? "right" : "left") +
+              " of target (you average " +
+              Math.abs(club.side).toFixed(0) +
+              " m " +
+              (club.side > 0 ? "right" : "left") +
+              " with this club).",
+          "Typical spread: ±" + club.spread.toFixed(0) + " m side to side.",
+        ];
+        if (Math.abs(club.carry - adj) > 6)
+          lines.push(
+            "Closest club is " +
+              Math.abs(club.carry - adj).toFixed(0) +
+              " m off, so consider a 3/4 shot.",
+          );
+        if (club.n < 5) lines.push("Note: based on only " + club.n + " shots.");
+        out.textContent = lines.join("\n");
+      });
     </script>
   </body>
 </html>
