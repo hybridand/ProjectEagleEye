@@ -1,81 +1,108 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Golf Caddy</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
-    table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
-    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ddd; }
-    th { background: #f3f3f3; }
-  </style>
-</head>
-<body>
-  <h1>Golf Caddy</h1>
-  <p>Upload a TrackMan CSV export to build your bag profile.</p>
-  <input type="file" id="file" accept=".csv">
-  <table id="results"></table>
-
-  <script>
-    // Helpers: TrackMan uses commas as decimals ("83,9"), so convert first
-    const num = v => parseFloat(String(v).replace(',', '.'));
-    const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
-    const std = a => Math.sqrt(mean(a.map(x => (x - mean(a)) ** 2)));
-
-    // When a file is chosen, read it and show the results
-    document.getElementById('file').addEventListener('change', e => {
-      const reader = new FileReader();
-      reader.onload = () => showBag(parseTrackMan(reader.result));
-      reader.readAsText(e.target.files[0]);
-    });
-
-    // Turn the CSV text into a list of shots
-    function parseTrackMan(text) {
-      const lines = text.split(/\r?\n/);
-      if (lines[0].startsWith('sep=')) lines.shift(); // remove the "sep=;" first line
-      const parsed = Papa.parse(lines.join('\n'), {
-        header: true, delimiter: ';', skipEmptyLines: true
-      });
-      return parsed.data.filter(row => row['Player']); // drops the units row
-    }
-
-    // Group shots by club and calculate carry, average side and spread
-    function showBag(shots) {
-      const groups = {};
-      for (const s of shots) {
-        const carry = num(s['Carry Flat - Length']);
-        const side = num(s['Carry Flat - Side']);
-        if (isNaN(carry) || isNaN(side)) continue;
-        const name = s['Club'] + (s['Tags'] ? ' (' + s['Tags'] + ')' : '');
-        (groups[name] ||= []).push({ carry, side });
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Golf Caddy</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 700px;
+        margin: 2rem auto;
+        padding: 0 1rem;
       }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 1rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 1px solid #ddd;
+      }
+      th {
+        background: #f3f3f3;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Golf Caddy</h1>
+    <p>Upload a TrackMan CSV export to build your bag profile.</p>
+    <input type="file" id="file" accept=".csv" />
+    <table id="results"></table>
 
-      const rows = Object.entries(groups).map(([club, list]) => ({
-        club,
-        n: list.length,
-        carry: mean(list.map(x => x.carry)),
-        side: mean(list.map(x => x.side)),
-        spread: std(list.map(x => x.side))
-      })).sort((a, b) => b.carry - a.carry);
+    <script>
+      // Helpers: TrackMan uses commas as decimals ("83,9"), so convert first
+      const num = (v) => parseFloat(String(v).replace(",", "."));
+      const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+      const std = (a) => Math.sqrt(mean(a.map((x) => (x - mean(a)) ** 2)));
 
-      const table = document.getElementById('results');
-      table.innerHTML = '';
-      const head = table.insertRow();
-      ['Club', 'Shots', 'Carry (m)', 'Avg side', 'Spread ±(m)'].forEach(t => {
-        const th = document.createElement('th');
-        th.textContent = t;
-        head.appendChild(th);
+      // When a file is chosen, read it and show the results
+      document.getElementById("file").addEventListener("change", (e) => {
+        const reader = new FileReader();
+        reader.onload = () => showBag(parseTrackMan(reader.result));
+        reader.readAsText(e.target.files[0]);
       });
-      rows.forEach(r => {
-        const tr = table.insertRow();
-        [r.club, r.n, r.carry.toFixed(0),
-         (r.side > 0 ? 'R ' : 'L ') + Math.abs(r.side).toFixed(0),
-         r.spread.toFixed(0)
-        ].forEach(v => tr.insertCell().textContent = v);
-      });
-    }
-  </script>
-</body>
+
+      function parseTrackMan(text) {
+        text = text.replace(/^\uFEFF/, ""); // remove invisible BOM character
+        const lines = text.split(/\r?\n/);
+        if (lines[0].trim().startsWith("sep=")) lines.shift();
+        const parsed = Papa.parse(lines.join("\n"), {
+          header: true,
+          delimiter: ";",
+          skipEmptyLines: true,
+          transformHeader: (h) => h.trim(),
+        });
+        console.log("Columns found:", parsed.meta.fields);
+        console.log("Rows parsed:", parsed.data.length);
+        return parsed.data.filter((row) => row["Club"]); // units row has no club, so it's dropped
+      }
+      // Group shots by club and calculate carry, average side and spread
+      function showBag(shots) {
+        const groups = {};
+        for (const s of shots) {
+          const carry = num(s["Carry Flat - Length"]);
+          const side = num(s["Carry Flat - Side"]);
+          if (isNaN(carry) || isNaN(side)) continue;
+          const name = s["Club"] + (s["Tags"] ? " (" + s["Tags"] + ")" : "");
+          (groups[name] ||= []).push({ carry, side });
+        }
+
+        const rows = Object.entries(groups)
+          .map(([club, list]) => ({
+            club,
+            n: list.length,
+            carry: mean(list.map((x) => x.carry)),
+            side: mean(list.map((x) => x.side)),
+            spread: std(list.map((x) => x.side)),
+          }))
+          .sort((a, b) => b.carry - a.carry);
+
+        const table = document.getElementById("results");
+        table.innerHTML = "";
+        const head = table.insertRow();
+        ["Club", "Shots", "Carry (m)", "Avg side", "Spread ±(m)"].forEach(
+          (t) => {
+            const th = document.createElement("th");
+            th.textContent = t;
+            head.appendChild(th);
+          },
+        );
+        rows.forEach((r) => {
+          const tr = table.insertRow();
+          [
+            r.club,
+            r.n,
+            r.carry.toFixed(0),
+            (r.side > 0 ? "R " : "L ") + Math.abs(r.side).toFixed(0),
+            r.spread.toFixed(0),
+          ].forEach((v) => (tr.insertCell().textContent = v));
+        });
+      }
+    </script>
+  </body>
 </html>
