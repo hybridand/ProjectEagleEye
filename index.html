@@ -59,6 +59,9 @@
         <option value="head">Headwind</option>
         <option value="tail">Tailwind</option>
       </select>
+      <label
+        >Temperature (°C) <input type="number" id="temp" value="15"
+      /></label>
     </label>
     <label
       >Lie
@@ -203,9 +206,11 @@
 
         const dist = parseFloat(document.getElementById("dist").value);
         const wind = parseFloat(document.getElementById("wind").value) || 0;
+        const TEMP_PCT = 0.2; // % longer per °C below 25°C (rough rule of thumb)
         const dir = document.getElementById("winddir").value;
         const lie = document.getElementById("lie").value;
         const danger = document.getElementById("danger").value;
+        const temp = parseFloat(document.getElementById("temp").value);
         if (isNaN(dist)) {
           out.textContent = "Enter a distance.";
           return;
@@ -215,6 +220,7 @@
         let adj =
           dist * (1 + ((dir === "head" ? HEAD_PCT : -TAIL_PCT) * wind) / 100);
         if (lie === "rough") adj *= 1 + ROUGH_PCT / 100;
+        if (!isNaN(temp)) adj *= 1 + (TEMP_PCT * (25 - temp)) / 100;
 
         // Trouble short = must carry it; trouble long = must not fly it
         let options = bag;
