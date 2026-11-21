@@ -9,8 +9,11 @@
       body {
         font-family: system-ui, sans-serif;
         max-width: 700px;
-        margin: 2rem auto;
-        padding: 0 1rem;
+        margin: 0 auto;
+        padding: 1rem 1rem 5rem; /* room for the bottom tab bar */
+      }
+      h1 {
+        margin-top: 0;
       }
       table {
         border-collapse: collapse;
@@ -28,67 +31,180 @@
       }
       label {
         display: block;
-        margin: 0.6rem 0;
+        margin: 0.8rem 0;
       }
       input,
       select {
         margin-left: 0.5rem;
-        padding: 4px;
+        padding: 8px;
+        font-size: 1rem;
+      }
+      button {
+        font-size: 1rem;
+      }
+
+      .tab {
+        display: none;
+      }
+      .tab.active {
+        display: block;
+      }
+
+      #advise {
+        width: 100%;
+        padding: 14px;
+        font-size: 1.1rem;
+        background: #1b6b3a;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        margin-top: 0.5rem;
       }
       #advice {
         white-space: pre-line;
         font-weight: 600;
+        font-size: 1.1rem;
+        background: #eef7f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 1rem;
+      }
+      #advice:empty {
+        display: none;
+      }
+
+      #status {
+        background: #eef7f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin: 1rem 0;
+      }
+
+      nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        background: white;
+        border-top: 1px solid #ccc;
+      }
+      nav button {
+        flex: 1;
+        padding: 16px 0;
+        border: none;
+        background: none;
+        font-weight: 600;
+        color: #666;
+      }
+      nav button.active {
+        color: #1b6b3a;
+        border-top: 3px solid #1b6b3a;
       }
     </style>
   </head>
   <body>
     <h1>Golf Caddy</h1>
-    <p>Upload a TrackMan CSV export to build your bag profile.</p>
-    <input type="file" id="file" accept=".csv" />
-    <table id="results"></table>
-    <h2>Shot advisor</h2>
-    <label
-      >Distance to target (m) <input type="number" id="dist" value="140"
-    /></label>
-    <label
-      >Wind (m/s) <input type="number" id="wind" value="0" step="0.5"
-    /></label>
-    <label
-      >Wind direction
-      <select id="winddir">
-        <option value="head">Headwind</option>
-        <option value="tail">Tailwind</option>
-      </select>
-      <label
-        >Temperature (°C) <input type="number" id="temp" value="15"
-      /></label>
-    </label>
-    <label
-      >Lie
-      <select id="lie">
-        <option value="fairway">Fairway / tee</option>
-        <option value="rough">Rough</option>
-      </select>
-    </label>
-    <label
-      >Trouble
-      <select id="danger">
-        <option value="none">None</option>
-        <option value="short">Short of target (water, bunker)</option>
-        <option value="long">Long of target</option>
-      </select>
-    </label>
-    <button id="advise">Get advice</button>
-    <p id="advice"></p>
+
+    <!-- TAB 1: CADDY -->
+    <section class="tab" id="tab-caddy">
+      <p id="nodata">No data yet. <button id="goSetup">Go to Setup</button></p>
+      <div id="advisor">
+        <label
+          >Distance to target (m)
+          <input type="text" inputmode="decimal" id="dist" value="140" />
+        </label>
+        <label
+          >Wind (m/s)
+          <input type="text" inputmode="decimal" id="wind" value="0" />
+        </label>
+        <label
+          >Wind direction
+          <select id="winddir">
+            <option value="head">Headwind</option>
+            <option value="tail">Tailwind</option>
+          </select>
+        </label>
+        <label
+          >Temperature (°C)
+          <input type="text" id="temp" value="15" />
+        </label>
+        <label
+          >Lie
+          <select id="lie">
+            <option value="fairway">Fairway / tee</option>
+            <option value="rough">Rough</option>
+          </select>
+        </label>
+        <label
+          >Trouble
+          <select id="danger">
+            <option value="none">None</option>
+            <option value="short">Short of target (water, bunker)</option>
+            <option value="long">Long of target</option>
+          </select>
+        </label>
+        <button id="advise">Get advice</button>
+        <p id="advice"></p>
+      </div>
+    </section>
+
+    <!-- TAB 2: MY BAG -->
+    <section class="tab" id="tab-bag">
+      <h2>My bag</h2>
+      <table id="results"></table>
+    </section>
+
+    <!-- TAB 3: SETUP -->
+    <section class="tab" id="tab-setup">
+      <h2>Setup</h2>
+      <p>Upload a TrackMan CSV export to build your bag profile.</p>
+      <input type="file" id="file" accept=".csv" />
+      <p id="status"></p>
+    </section>
+
+    <nav>
+      <button data-tab="caddy">Caddy</button>
+      <button data-tab="bag">My Bag</button>
+      <button data-tab="setup">Setup</button>
+    </nav>
 
     <script>
+      // ---- Tabs ----
+      function showTab(name) {
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.toggle("active", t.id === "tab-" + name));
+        document
+          .querySelectorAll("nav button")
+          .forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+      }
+      document
+        .querySelectorAll("nav button")
+        .forEach((b) =>
+          b.addEventListener("click", () => showTab(b.dataset.tab)),
+        );
+      document
+        .getElementById("goSetup")
+        .addEventListener("click", () => showTab("setup"));
+
       // Helpers: TrackMan uses commas as decimals ("83,9"), so convert first
       const num = (v) => parseFloat(String(v).replace(",", "."));
       const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
       const std = (a) => Math.sqrt(mean(a.map((x) => (x - mean(a)) ** 2)));
 
-      // When a file is chosen, read it and show the results
+      const MIN_GAP = 6; // below this (m), two clubs overlap
+      const MAX_GAP = 15; // above this (m), there's a hole in your bag
+      const HEAD_PCT = 2; // % longer per m/s of headwind (rough rule of thumb)
+      const TAIL_PCT = 1; // % shorter per m/s of tailwind
+      const ROUGH_PCT = 8; // % longer from the rough
+      const TEMP_PCT = 0.2; // % longer per °C below 25°C (rough rule of thumb)
+
+      let bag = [];
+
+      // ---- Upload ----
       document.getElementById("file").addEventListener("change", (e) => {
+        if (!e.target.files[0]) return;
         const reader = new FileReader();
         reader.onload = () => showBag(parseTrackMan(reader.result));
         reader.readAsText(e.target.files[0]);
@@ -106,12 +222,10 @@
         });
         console.log("Columns found:", parsed.meta.fields);
         console.log("Rows parsed:", parsed.data.length);
-        return parsed.data.filter((row) => row["Club"]); // units row has no club, so it's dropped
+        return parsed.data.filter((row) => row["Club"]); // units row has no club
       }
-      // Group shots by club and calculate carry, average side and spread
-      const MIN_GAP = 6; // below this (m), two clubs overlap
-      const MAX_GAP = 15; // above this (m), there's a hole in your bag
 
+      // Group shots by club and calculate carry, average side and spread
       function showBag(shots) {
         const groups = {};
         for (const s of shots) {
@@ -131,8 +245,46 @@
             spread: std(list.map((x) => x.side)),
           }))
           .sort((a, b) => b.carry - a.carry);
-        saveBag(rows);
 
+        if (rows.length === 0) {
+          document.getElementById("status").textContent =
+            "No usable shots found in that file. Check the columns in the console.";
+          return;
+        }
+
+        saveBag(rows);
+        renderAll();
+        showTab("caddy");
+      }
+
+      function saveBag(rows) {
+        bag = rows;
+        try {
+          localStorage.setItem("bag", JSON.stringify(rows));
+        } catch (e) {}
+      }
+
+      // ---- Rendering ----
+      function renderAll() {
+        renderTable(bag);
+        const has = bag.length > 0;
+        document.getElementById("advisor").style.display = has
+          ? "block"
+          : "none";
+        document.getElementById("nodata").style.display = has
+          ? "none"
+          : "block";
+        const shotCount = bag.reduce((s, r) => s + r.n, 0);
+        document.getElementById("status").textContent = has
+          ? "Data loaded: " +
+            shotCount +
+            " shots, " +
+            bag.length +
+            " clubs. Upload a new file to replace it."
+          : "No data loaded yet.";
+      }
+
+      function renderTable(rows) {
         // Gap to the next club down, counting full swings only (skip 3/4 shots)
         const full = rows.filter((r) => !r.club.includes("("));
         full.forEach((r, i) => {
@@ -177,26 +329,8 @@
           ].forEach((v) => (tr.insertCell().textContent = v));
         });
       }
-      // ---- Step 3: shot advisor ----
-      let bag = [];
-      const HEAD_PCT = 2; // % longer per m/s of headwind (rough rule of thumb)
-      const TAIL_PCT = 1; // % shorter per m/s of tailwind
-      const ROUGH_PCT = 8; // % longer from the rough
 
-      function saveBag(rows) {
-        bag = rows;
-        try {
-          localStorage.setItem("bag", JSON.stringify(rows));
-        } catch (e) {}
-      }
-
-      // Load a saved bag when the page opens
-      try {
-        bag = JSON.parse(localStorage.getItem("bag")) || [];
-      } catch (e) {
-        bag = [];
-      }
-
+      // ---- Shot advisor ----
       document.getElementById("advise").addEventListener("click", () => {
         const out = document.getElementById("advice");
         if (bag.length === 0) {
@@ -204,13 +338,12 @@
           return;
         }
 
-        const dist = parseFloat(document.getElementById("dist").value);
-        const wind = parseFloat(document.getElementById("wind").value) || 0;
-        const TEMP_PCT = 0.2; // % longer per °C below 25°C (rough rule of thumb)
+        const dist = num(document.getElementById("dist").value);
+        const wind = num(document.getElementById("wind").value) || 0;
         const dir = document.getElementById("winddir").value;
         const lie = document.getElementById("lie").value;
         const danger = document.getElementById("danger").value;
-        const temp = parseFloat(document.getElementById("temp").value);
+        const temp = num(document.getElementById("temp").value);
         if (isNaN(dist)) {
           out.textContent = "Enter a distance.";
           return;
@@ -265,6 +398,15 @@
         if (club.n < 5) lines.push("Note: based on only " + club.n + " shots.");
         out.textContent = lines.join("\n");
       });
+
+      // ---- Startup: load saved bag, open the right tab ----
+      try {
+        bag = JSON.parse(localStorage.getItem("bag")) || [];
+      } catch (e) {
+        bag = [];
+      }
+      renderAll();
+      showTab(bag.length > 0 ? "caddy" : "setup");
     </script>
   </body>
 </html>
